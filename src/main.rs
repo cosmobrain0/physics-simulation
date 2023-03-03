@@ -1,7 +1,8 @@
+mod vector;
+
 use flo_draw::*;
 use flo_canvas::*;
-
-
+use vector::Vector::Vector;
 
 pub fn main() {
     with_2d_graphics(|| {
