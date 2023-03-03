@@ -1,0 +1,8 @@
+[package]
+name = "physics-simulation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+flo_canvas = "0.3.0"
+flo_draw = "0.3.0"
