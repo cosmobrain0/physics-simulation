@@ -1,3 +1,4 @@
+mod collision;
 mod triangle;
 mod vector;
 
@@ -9,17 +10,19 @@ use std::cell::RefCell;
 use std::sync::Mutex;
 
 struct AppData {
-    triangle: Triangle
+    triangleA: Triangle,
+    triangleB: Triangle,
 }
 
 pub fn main() {
     with_2d_graphics(|| {
-        let mut triangle = Triangle::new(Vector::new(400.0, 400.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
-        triangle.accelerate(Vector::right());
-        triangle.accelerate_rotation(0.02);
+        let mut triangleA = Triangle::new(Vector::new(400.0, 400.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
+        let mut triangleB = Triangle::new(Vector::new(400.0, 400.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
+        triangleB.accelerate(Vector::right());
+        triangleB.accelerate_rotation(0.02);
 
         let data = Mutex::new(RefCell::new(AppData {
-            triangle
+            triangleA, triangleB
         }));
         let render = |ctx: &mut CanvasGraphicsContext| {
             render_loop(ctx, &data);
@@ -36,13 +39,19 @@ pub fn main() {
 fn render_loop(ctx: &mut CanvasGraphicsContext, data: &Mutex<RefCell<AppData>>) {
     let data_ref = data.lock().unwrap();
     let mut data = data_ref.borrow_mut();
-    data.triangle.update();
+    data.triangleA.update();
+    data.triangleB.update();
     
     ctx.clear_canvas(Color::Rgba(0.0, 0.4, 0.4, 1.0));
     ctx.canvas_height(1000.0);
     ctx.center_region(0.0, 0.0, 1000.0, 1000.0);
     
     ctx.fill_color(Color::Rgba(0.0, 0.0, 0.8, 1.0));
+
+    if (Triangle::collision(&data.triangleA, &data.triangleB)) {
+        println!("Collision!");
+    } else { println!("No Collision!"); }
     
-    data.triangle.draw(ctx);
+    data.triangleA.draw(ctx);
+    data.triangleB.draw(ctx);
 }
