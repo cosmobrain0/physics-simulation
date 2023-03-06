@@ -68,7 +68,7 @@ pub mod triangle {
         }
 
         pub fn collision(tri1: &Triangle, tri2: &Triangle) -> bool {
-            collision::collision::triangle_collision(tri1, tri2, 0.01)
+            collision::collision::triangle_collision(tri1, tri2)
         }
     }
 }
