@@ -67,7 +67,7 @@ pub mod triangle {
             (sa <= 0.0 && sb <= 0.0 && sc <= 0.0) || (ta <= 0.0 && tb <= 0.0 && tc <= 0.0) || (sa+ta >= D && sb+tb >= D && sc+tc >= D)
         }
 
-        pub fn collision(tri1: &Triangle, tri2: &Triangle) -> bool {
+        pub fn collision_points(tri1: &Triangle, tri2: &Triangle) -> Option<Vec<Vector>> {
             collision::collision::triangle_collision(tri1, tri2)
         }
     }

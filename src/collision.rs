@@ -12,8 +12,7 @@ pub mod collision {
 
     fn check_winding(t: &TrianglePoints) -> Result<(), ()> {
         let det = det2d(t);
-        if (det < 0.0) { return Err(()); }
-        Ok(())
+        if det < 0.0 { Err(()) } else { Ok(()) }
     }
 
     fn boundary_collision_check(t: &TrianglePoints, eps: f32) -> bool { det2d(t) < eps }
@@ -61,34 +60,41 @@ pub mod collision {
         )).abs() <= 0.001
     }
 
+    // y = mx + c
+    #[derive(Clone, Copy)]
+    struct LineEquation {
+        m: f32, c: f32
+    }
     struct Line {
-        p1: Vector, p2: Vector, m: Option<f32>, c: Option<f32>
+        p1: Vector, p2: Vector, equation: Option<LineEquation>
     }
     impl Line {
         pub fn new(p1: Vector, p2: Vector) -> Self {
             if p1.x == p2.x {
                 // vertical line
-                Self { p1, p2, m: None, c: None }
+                Self { p1, p2, equation: None }
             } else {
                 let m = (p2.y-p1.y)/(p2.x-p1.x);
-                Self { p1, p2, m: Some(m), c: Some(p1.y-m*p1.x) }
+                Self { p1, p2, equation: Some(LineEquation { m, c: p1.y-m*p1.x }) }
             }
         }
 
         pub fn perpendicular_through_point(&self, point: Vector) -> Self {
-            if self.m == Some(0.0) {
-                // horizontal line
-                Self { p1: point, p2: Vector::new(point.x, self.p1.y), m: None, c: None }
-            } else if let None = self.m {
-                // vertical line
-                Self { p1: point, p2: Vector::new(self.p1.x, point.y), m: Some(0.0), c: Some(point.y) }
-            } else {
-                let m = self.m.unwrap();
-                let c = self.c.unwrap();
-                let m2 = -1.0/m;
-                let c2 = point.y - m2*point.x;
-                let p2x = (c2-c)/(m-m2);
-                Self { p1: point, p2: Vector::new(p2x, m2*p2x+c2), m: Some(m2), c: Some(c2) }
+            match self.equation {
+                Some(LineEquation { m: 0.0, c }) => {
+                    // horizontal line
+                    Self { p1: point, p2: Vector::new(point.x, self.p1.y), equation: None }
+                },
+                None => {
+                    // vertical line
+                    Self { p1: point, p2: Vector::new(self.p1.x, point.y), equation: Some(LineEquation { m: 0.0, c: point.y }) }
+                },
+                Some(LineEquation { m, c }) => {
+                    let m2 = -1.0/m;
+                    let c2 = point.y - m2*point.x;
+                    let p2x = (c2-c)/(m-m2);
+                    Self { p1: point, p2: Vector::new(p2x, m2*p2x+c2), equation: Some(LineEquation { m: m2, c: c2 }) }
+                }
             }
         }
     }
@@ -103,33 +109,45 @@ pub mod collision {
 
     fn in_range(value: f32, boundary_one: f32, boundary_two: f32) -> bool { value >= boundary_one.min(boundary_two) && value <= boundary_two.max(boundary_one) }
 
-    fn line_line_intersection(l1: &Line, l2: &Line) -> bool {
-        // ignoring vertical lines and horizontal lines
-        match (l1.m, l1.c, l2.m, l2.c) {
-            (Some(m1), Some(c1), Some(m2), Some(c2)) => {
-                if m1 == m2 && c1 == c2 {
-                    range_overlap(
-                        if l1.p1.x < l1.p2.x { (l1.p1.x, l1.p2.x) } else { (l1.p2.x, l1.p1.x) },
-                        if l2.p1.x < l2.p2.x { (l2.p1.x, l2.p2.x) } else { (l2.p2.x, l2.p1.x) },
-                    ) != None
-                } else if m1 == m2 { false }
+    struct LineCollisionData<'a> {
+        l1: &'a Line,
+        l2: &'a Line,
+        intersection: Option<Vector>
+    }
+
+    fn line_line_intersection<'a>(l1: &'a Line, l2: &'a Line) -> LineCollisionData<'a> {
+        // ignoring vertical lines and horizontal lines for now
+        // if lines are parallel, collisions WON'T be detected
+        match (l1.equation, l2.equation) {
+            (Some(LineEquation { m: m1, c: c1 }), Some(LineEquation { m: m2, c: c2 })) => {
+                if m1 == m2 { LineCollisionData { l1: &l1, l2: &l2, intersection: None } }
                 else {
                     let x = (c1-c2)/(m2-m1);
-                    in_range(x, l1.p1.x, l1.p2.x) && in_range(x, l2.p1.x, l2.p2.x)
+                    if in_range(x, l1.p1.x, l1.p2.x) && in_range(x, l2.p1.x, l2.p2.x) {
+                        LineCollisionData { l1: &l1, l2: &l2, intersection: Some(Vector::new(x, m1*x + c1)) }
+                    } else { LineCollisionData { l1: &l1, l2: &l2, intersection: None } }
                 }
             },
-            _ => false // TODO: this
+            _ => LineCollisionData { l1: &l1, l2: &l2, intersection: None } // TODO: this
         }
     }
 
-    pub fn triangle_collision(t1: &Triangle, t2: &Triangle) -> bool {
+    pub fn triangle_collision(t1: &Triangle, t2: &Triangle) -> Option<Vec<Vector>> {
+        let mut collisions = Vec::with_capacity(6);
         for i in 0..3 {
             let line1 = Line::new(t1.points[i], t1.points[(i+1)%3]);
             for j in 0..3 {
-                let line2 = Line::new(t2.points[i], t2.points[(i+1)%3]);
-                if line_line_intersection(&line1, &line2) { return true; }
+                let line2 = Line::new(t2.points[j], t2.points[(j+1)%3]);
+                if let Some(collision) = line_line_intersection(&line1, &line2).intersection {
+                    collisions.push(collision);
+                }
             }
         }
-        false
+        if collisions.len() == 0 { None } else { Some(collisions) }
+    }
+
+    // find the reaction forces required to push these triangles out of each other
+    pub fn resolve_triangle_collision(t1: &Triangle, t2: &Triangle, collision_points: &Vec<Vector>) -> (Vector, Vector) {
+        panic!("No code has been written to resolve triangle collision yet!");
     }
 }

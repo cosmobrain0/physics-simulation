@@ -45,13 +45,20 @@ fn render_loop(ctx: &mut CanvasGraphicsContext, data: &Mutex<RefCell<AppData>>) 
     ctx.clear_canvas(Color::Rgba(0.0, 0.4, 0.4, 1.0));
     ctx.canvas_height(1000.0);
     ctx.center_region(0.0, 0.0, 1000.0, 1000.0);
-    
-    ctx.fill_color(Color::Rgba(0.0, 0.0, 0.8, 1.0));
 
-    if (Triangle::collision(&data.triangleA, &data.triangleB)) {
-        println!("Collision!");
-    } else { println!("No Collision!"); }
-    
+    ctx.fill_color(Color::Rgba(0.3, 0.3, 0.3, 0.4));
     data.triangleA.draw(ctx);
     data.triangleB.draw(ctx);
+
+    let collision_points = Triangle::collision_points(&data.triangleA, &data.triangleB);
+    match collision_points {
+        None => println!("No Collision!"),
+        Some(points) => {
+            ctx.fill_color(Color::Rgba(1.0, 1.0, 1.0, 1.0));
+            for point in points.iter() {
+                ctx.circle(point.x, point.y, 10.0);
+            }
+            ctx.fill();
+        }
+    }
 }
