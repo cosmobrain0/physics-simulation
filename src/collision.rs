@@ -23,12 +23,12 @@ pub mod collision {
         // these variables are replaced with their values in this translation of the original c# code.
 
         // triangles must be counter-clockwise
-        check_winding(&TrianglePoints(t1.points[0], t1.points[1], t1.points[2])).unwrap();
-        check_winding(&TrianglePoints(t2.points[0], t2.points[1], t2.points[2])).unwrap();
+        check_winding(&TrianglePoints(t1.points[0].position, t1.points[1].position, t1.points[2].position)).unwrap();
+        check_winding(&TrianglePoints(t2.points[0].position, t2.points[1].position, t2.points[2].position)).unwrap();
 
         let check_edge = boundary_collision_check;
-        let lp1 = t1.points;
-        let lp2 = t2.points;
+        let lp1: Vec<Vector> = t1.points.iter().map(|x| { x.position }).collect();
+        let lp2: Vec<Vector> = t2.points.iter().map(|x| { x.position }).collect();
 
         for i in 0..3 {
             let j = (i+1)%3;
@@ -53,10 +53,10 @@ pub mod collision {
 
     // if a triangle is completely inside another triangle, no collision should be registered.
     fn triangle_point_collision(triangle: &Triangle, point: Vector) -> bool {
-        (triangle_area(triangle.points[0], triangle.points[1], triangle.points[2]) - (
-            triangle_area(triangle.points[0], triangle.points[1], point) +
-            triangle_area(triangle.points[1], triangle.points[2], point) +
-            triangle_area(triangle.points[2], triangle.points[0], point)
+        (triangle_area(triangle.points[0].position, triangle.points[1].position, triangle.points[2].position) - (
+            triangle_area(triangle.points[0].position, triangle.points[1].position, point) +
+            triangle_area(triangle.points[1].position, triangle.points[2].position, point) +
+            triangle_area(triangle.points[2].position, triangle.points[0].position, point)
         )).abs() <= 0.001
     }
 
@@ -135,9 +135,9 @@ pub mod collision {
     pub fn triangle_collision(t1: &Triangle, t2: &Triangle) -> Option<Vec<Vector>> {
         let mut collisions = Vec::with_capacity(6);
         for i in 0..3 {
-            let line1 = Line::new(t1.points[i], t1.points[(i+1)%3]);
+            let line1 = Line::new(t1.points[i].position, t1.points[(i+1)%3].position);
             for j in 0..3 {
-                let line2 = Line::new(t2.points[j], t2.points[(j+1)%3]);
+                let line2 = Line::new(t2.points[j].position, t2.points[(j+1)%3].position);
                 if let Some(collision) = line_line_intersection(&line1, &line2).intersection {
                     collisions.push(collision);
                 }

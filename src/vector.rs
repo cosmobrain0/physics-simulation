@@ -26,6 +26,10 @@ pub mod vector {
                 y: cos*self.y - sin*self.x
             }
         }
+        pub fn dot(&self, other: &Vector) -> f32 { self.x*other.x + self.y*other.y }
+        pub fn project(&self, project_to: &Vector) -> Vector { *project_to * (self.dot(project_to) / project_to.dot(project_to)) }
+        pub fn clockwise_90deg(&self) -> Vector { Vector { x: self.y, y: -self.x } }
+        pub fn anticlockwise_90deg(&self) -> Vector { Vector { x: -self.y, y: self.x } }
     }
 
     impl Add for Vector {

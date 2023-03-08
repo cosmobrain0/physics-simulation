@@ -16,19 +16,20 @@ struct AppData {
 
 pub fn main() {
     with_2d_graphics(|| {
-        let mut triangleA = Triangle::new(Vector::new(400.0, 400.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
-        let mut triangleB = Triangle::new(Vector::new(400.0, 400.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
-        triangleB.accelerate(Vector::right());
-        triangleB.accelerate_rotation(0.02);
+        let mut triangle_a = Triangle::new(Vector::new(400.0, 405.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
+        triangle_a.translate(Vector::new(250.0, 0.0));
+        let mut triangle_b = Triangle::new(Vector::new(400.0, 405.0), Vector::new(600.0, 400.0), Vector::new(500.0, 600.0));
+        triangle_b.accelerate(Vector::new(600.0, 400.0), Vector::right());
 
         let data = Mutex::new(RefCell::new(AppData {
-            triangleA, triangleB
+            triangleA: triangle_a, triangleB: triangle_b
         }));
         let render = |ctx: &mut CanvasGraphicsContext| {
             render_loop(ctx, &data);
         };
         
         let canvas = create_canvas_window("Hello, triangle");
+        std::thread::sleep(std::time::Duration::from_millis(5000));
         loop {
             canvas.draw(render);
             std::thread::sleep(std::time::Duration::from_millis(1000/60));
@@ -52,7 +53,7 @@ fn render_loop(ctx: &mut CanvasGraphicsContext, data: &Mutex<RefCell<AppData>>) 
 
     let collision_points = Triangle::collision_points(&data.triangleA, &data.triangleB);
     match collision_points {
-        None => println!("No Collision!"),
+        None => (),
         Some(points) => {
             ctx.fill_color(Color::Rgba(1.0, 1.0, 1.0, 1.0));
             for point in points.iter() {

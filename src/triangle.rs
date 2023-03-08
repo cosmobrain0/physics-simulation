@@ -4,67 +4,72 @@ pub mod triangle {
     use flo_canvas::{CanvasGraphicsContext, GraphicsContext};
 
     #[derive(Debug)]
-    pub struct Triangle {
-        pub points: [Vector; 3],
-        centre: Vector,
+    pub struct TrianglePoint {
+        pub position: Vector,
         velocity: Vector,
-        rotation: f32, // radians
-        angular_velocity: f32,
+    }
+
+    #[derive(Debug)]
+    pub struct Triangle {
+        pub points: [TrianglePoint; 3]
     }
 
     impl Triangle {
-        pub fn new(p1: Vector, p2: Vector, p3: Vector) -> Self { Self { points: [p1, p2, p3], centre: (p1+p2+p3)/3., velocity: Vector::zero(), rotation: 0.0, angular_velocity: 0.0 }}
+        pub fn new(p1: Vector, p2: Vector, p3: Vector) -> Self { Self { points: [
+            TrianglePoint { position: p1, velocity: Vector::zero() },
+            TrianglePoint { position: p2, velocity: Vector::zero() },
+            TrianglePoint { position: p3, velocity: Vector::zero() }
+        ]}}
+
         pub fn draw(&self, ctx: &mut CanvasGraphicsContext) {
             ctx.new_path();
-            ctx.move_to(self.points[0].x, self.points[0].y);
-            ctx.line_to(self.points[1].x, self.points[1].y);
-            ctx.line_to(self.points[2].x, self.points[2].y);
-            ctx.line_to(self.points[0].x, self.points[0].y);
+            ctx.move_to(self.points[0].position.x, self.points[0].position.y);
+            ctx.line_to(self.points[1].position.x, self.points[1].position.y);
+            ctx.line_to(self.points[2].position.x, self.points[2].position.y);
+            ctx.line_to(self.points[0].position.x, self.points[0].position.y);
             ctx.fill();
         }
 
+        fn centre(&self) -> Vector { self.points.iter().fold(Vector::zero(), |acc, val| { acc + val.position }) / 3.0 }
+
         pub fn update(&mut self) {
             // update position and rotation
-            self.translate(self.velocity);
-            self.rotate(self.angular_velocity);
+            // TODO: this asap
+            // for each point, calculate angular velocity and actual velocity
+            // sum them
+            // apply result to all points
+            let centre = self.centre();
+            let (direct_velocity, angular_velocity) = self.points.iter().fold((Vector::zero(), 0.0), |acc, val| {
+                let offset = val.position - centre;
+                // project velocity onto offset and find remainder
+                let offset_projection = val.velocity.project(&offset);
+                let remainder = val.velocity - offset_projection;
+                // calculate radians change based on offset length and remainder length (remainder wraps around circle with radius offset.length)
+                // circumference: 2 * pi * offset.length()
+                // length: remainder.length() = k * offset.length()
+                // radians: k = remainder.length() / offset.length()
+                // clockwise / counter-clockwise: dot(remainder, offset_rotated_90deg_clockwise) > 0 ? clockwise : counter-clockwise
+                let radians = remainder.length() / offset.length() * if remainder.dot(&offset.clockwise_90deg()) > 0.0 { 1.0 } else { -1.0 };
+                (acc.0 + offset_projection, acc.1 + radians)
+            });
+            self.translate(direct_velocity);
+            self.rotate(angular_velocity);
+            // panic!("Haven't written triangle updating code yet!");
         }
 
-        pub fn accelerate(&mut self, acceleration: Vector) {
-            self.velocity += acceleration;
+        pub fn accelerate(&mut self, accelerate_from: Vector, acceleration: Vector) {
+            let distances: Vec<_> = self.points.iter().map(|x| { (x.position-accelerate_from).length() }).collect();
+            let max_distance = distances.iter().fold(0.0, |acc, val| { acc + val });
+            self.points.iter_mut().enumerate().for_each(|(i, x)| { x.velocity += acceleration * (1.0 - distances[i] / max_distance) / 2.0; });
         }
 
-        pub fn accelerate_rotation(&mut self, acceleration: f32) {
-            self.angular_velocity += acceleration;
+        pub fn translate(&mut self, offset: Vector) {
+            self.points.iter_mut().for_each(|x| { x.position += offset; });
         }
 
-        fn translate(&mut self, offset: Vector) {
-            self.centre += offset;
-            self.points.iter_mut().for_each(|x| { *x += offset; });
-        }
-
-        fn rotate(&mut self, delta: f32) {
-            self.points.iter_mut().for_each(|x| {
-                *x = self.centre + (*x-self.centre).rotate(delta);
-            })
-        }
-
-        fn triangle_cross2(tri1: &Triangle, tri2: &Triangle) -> bool {
-            let da = tri1.points[0] - tri2.points[1];
-            let db = tri1.points[1] - tri2.points[1];
-            let dc = tri1.points[2] - tri2.points[1];
-            let dx21 = tri2.points[2].x - tri2.points[1].x;
-            let dy12 = tri2.points[1].y - tri2.points[2].y;
-            let D = dy12 * (tri2.points[0].x - tri2.points[2].x) + dx21 * (tri2.points[0].y - tri2.points[2].y);
-            let sa = dy12 * da.x + dx21 * da.y;
-            let sb = dy12 * db.x + dx21 * db.y;
-            let sc = dy12 * dc.x + dx21 * dc.y;
-            let ta = (tri2.points[2].y - tri2.points[0].y) * da.x + (tri2.points[0].x - tri2.points[2].x) * da.y;
-            let tb = (tri2.points[2].y - tri2.points[0].y) * db.x + (tri2.points[0].x - tri2.points[2].x) * db.y;
-            let tc = (tri2.points[2].y - tri2.points[0].y) * dc.x + (tri2.points[0].x - tri2.points[2].x) * dc.y;
-
-            if D < 0.0 { return (sa >= 0.0 && sb >= 0.0 && sc >= 0.0) || (ta >= 0.0 && tb >= 0.0 && tc >= 0.0) || (sa+ta <= D && sb+tb <= D && sc+tc <= D); }
-
-            (sa <= 0.0 && sb <= 0.0 && sc <= 0.0) || (ta <= 0.0 && tb <= 0.0 && tc <= 0.0) || (sa+ta >= D && sb+tb >= D && sc+tc >= D)
+        pub fn rotate(&mut self, offset: f32) {
+            let centre = self.centre();
+            self.points.iter_mut().for_each(|x| { x.position = (x.position - centre).rotate(offset) + centre });
         }
 
         pub fn collision_points(tri1: &Triangle, tri2: &Triangle) -> Option<Vec<Vector>> {
